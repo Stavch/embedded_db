@@ -2,8 +2,13 @@ use crate::types::{Key, Value, Record, RECORD_SIZE};
 use crate::flash::{FlashWriter, DB_START, DB_SIZE};
 
 use heapless::FnvIndexMap;
+use cortex_m_semihosting::hprintln;
 
-const MAX_RECORDS: usize = 16;
+#[cfg(feature = "simulate_constraints")]
+pub const MAX_RECORDS: usize = 4;
+
+#[cfg(not(feature = "simulate_constraints"))]
+pub const MAX_RECORDS: usize = 16;
 
 pub struct Database {
     store: FnvIndexMap<Key, Value, MAX_RECORDS>,
@@ -21,7 +26,11 @@ impl Database {
     }
 
     pub fn create(&mut self, key: Key, value: Value) -> Result<(), &'static str> {
-        self.store.insert(key, value).map_err(|_| "DB full")?;
+        self.store.insert(key, value).map_err(|_| {
+            #[cfg(feature = "simulate_constraints")]
+            hprintln!("💡 Simulated RAM limit hit: MAX_RECORDS reached");
+            "DB full"
+        })?;
         Ok(())
     }
 
@@ -43,16 +52,16 @@ impl Database {
     }
 
     pub fn persist(&mut self, record: &Record) -> Result<(), &'static str> {
-    if self.next_offset + RECORD_SIZE > DB_SIZE {
-        return Err("Flash full");
+        if self.next_offset + RECORD_SIZE > DB_SIZE {
+            return Err("Flash full");
+        }
+
+        let flash_addr = DB_START + self.next_offset;
+        FlashWriter::write(flash_addr, &record.to_bytes())?;
+        self.next_offset += RECORD_SIZE;
+
+        Ok(())
     }
-
-    let flash_addr = DB_START + self.next_offset;
-    FlashWriter::write(flash_addr, &record.to_bytes())?;
-    self.next_offset += RECORD_SIZE;
-
-    Ok(())
-}
 
     pub fn restore(&mut self) {
         self.store.clear();
