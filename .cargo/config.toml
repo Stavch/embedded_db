@@ -1,0 +1,15 @@
+[target.thumbv7em-none-eabihf]
+# This runner uses GDB to flash and debug the target via OpenOCD
+runner = "arm-none-eabi-gdb -q -x openocd.gdb"
+
+rustflags = [
+  # Linker flags are now set in build.rs, so no need to specify them here.
+  # If needed, you can uncomment and configure a custom linker:
+  # "-C", "linker=arm-none-eabi-ld",
+  # "-C", "link-arg=-Tlink.x",
+  # "-C", "link-arg=-nostartfiles",
+]
+
+[build]
+# Target Cortex-M4F with hardware floating point (FPU)
+target = "thumbv7em-none-eabihf"
